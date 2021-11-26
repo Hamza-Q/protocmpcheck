@@ -1,0 +1,2 @@
+# Ignore profiles and binaries built by the testdata Makefile
+_build/
