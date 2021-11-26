@@ -3,9 +3,12 @@ package protocmpcheck
 import (
 	"testing"
 
-	_ "github.com/Hamza-Q/protocmpcheck/testdata/src/testhelloworld"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
+
+func init() {
+	debug = true
+}
 
 func TestFromFileSystem(t *testing.T) {
 	testdata := analysistest.TestData()

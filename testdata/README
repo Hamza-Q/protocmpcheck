@@ -1,0 +1,4 @@
+Dependencies in testdata/src must unfortunately be vendored for use with
+analysistest because analysistest.Run sets GOPATH to that directory and
+GO111MODULE=off.
+See https://github.com/golang/go/issues/46041.

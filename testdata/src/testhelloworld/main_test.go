@@ -3,13 +3,15 @@ package testhelloworld
 import (
 	"context"
 	"net"
-	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 )
 
 type server struct {
@@ -20,42 +22,36 @@ func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloRe
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
 }
 
-func newServer(t *testing.T) string {
-	tmp := t.TempDir()
-	sockPath := filepath.Join(tmp, "listen.sock")
-	lis, err := net.Listen("unix", sockPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+var _ proto.Message = &pb.HelloReply{}
+
+func newServer(t *testing.T) *bufconn.Listener {
+	lis := bufconn.Listen(1024)
 	t.Cleanup(func() {
 		if err := lis.Close(); err != nil {
 			t.Logf("failed to stop listener: %v", err)
 		}
 	})
-	t.Logf("listening at %s", sockPath)
 	s := grpc.NewServer()
 	pb.RegisterGreeterServer(s, &server{})
 	go func() {
-		err := s.Serve(lis)
-		if err != nil {
+		if err := s.Serve(lis); err != nil {
 			t.Log(err)
 		}
 	}()
-	t.Cleanup(s.Stop)
-	return sockPath
+	return lis
 }
 
 func TestHelloWorld(t *testing.T) {
-	sockPath := newServer(t)
+	lis := newServer(t)
 	conn, err := grpc.Dial(
-		sockPath,
+		"bufnet",
 		grpc.WithInsecure(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+			return lis.Dial()
 		}),
 	)
 	if err != nil {
-		t.Fatalf("did onot connect %v", err)
+		t.Fatalf("did not connect %v", err)
 	}
 	t.Cleanup(func() { conn.Close() })
 
@@ -75,10 +71,17 @@ func TestHelloWorld(t *testing.T) {
 	// protocmpcheck should mark these calls as invalid.
 
 	// These can and should probably be generated but :shrug:
+	checkReflectDeepEqual(t, expResponse, r)
 	checkAssertEqual(t, expResponse, r)
 	checkRequireEqual(t, expResponse, r)
 	checkAssertStructEqual(t, expResponse, r)
 	checkRequireStructEqual(t, expResponse, r)
+}
+
+func checkReflectDeepEqual(t *testing.T, want, got *pb.HelloReply) {
+	if !reflect.DeepEqual(want, got) { // want "comparing proto"
+		t.Errorf("want: %+v; got: %+v", want, got)
+	}
 }
 
 func checkRequireEqual(t *testing.T, want, got *pb.HelloReply) {
@@ -95,6 +98,10 @@ func checkRequireEqual(t *testing.T, want, got *pb.HelloReply) {
 	require.ElementsMatch(t, expInterfaceSlice, gotInterfaceSlice) // want "comparing proto"
 }
 
-func checkAssertEqual(t *testing.T, exp, r *pb.HelloReply)        {}
-func checkAssertStructEqual(t *testing.T, exp, r *pb.HelloReply)  {}
-func checkRequireStructEqual(t *testing.T, exp, r *pb.HelloReply) {}
+func checkRequireStructEqual(t *testing.T, want, got *pb.HelloReply) {
+	require := require.New(t)
+	require.EqualValues(want, got) // want "comparing proto"
+}
+
+func checkAssertEqual(t *testing.T, exp, r *pb.HelloReply)       {}
+func checkAssertStructEqual(t *testing.T, exp, r *pb.HelloReply) {}

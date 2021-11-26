@@ -3,8 +3,7 @@ module github.com/Hamza-Q/protocmpcheck
 go 1.15
 
 require (
-	github.com/Hamza-Q/protocmpcheck/testdata/src/testhelloworld v0.0.0
+	github.com/golang/protobuf v1.5.0
 	golang.org/x/tools v0.1.7
+	google.golang.org/protobuf v1.27.1
 )
-
-replace github.com/Hamza-Q/protocmpcheck/testdata/src/testhelloworld => /home/qureshi/repos/protocmpcheck/testdata/src/testhelloworld
