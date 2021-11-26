@@ -62,13 +62,36 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 	logf("Found SelectorExpr: %s", sel.Sel.Name)
 
 	selIdent, _ := sel.X.(*ast.Ident)
-	pkgName, ok := pass.TypesInfo.Uses[selIdent].(*types.PkgName)
+	logf("with selIdent: %s", selIdent)
+	selObj, ok := pass.TypesInfo.Uses[selIdent]
 	if !ok {
-		logf("not a pkgName: %s", selIdent)
+		logf("no uses")
 		return
 	}
-	fullImportPath := pkgName.Imported().Path()
+	pkgName, ok := selObj.(*types.PkgName)
+	var fullImportPath string
+	if ok {
+		fullImportPath = pkgName.Imported().Path()
+	} else {
+		logf("not a pkgName: %s", selIdent)
+		// Extract package if this is a method.
+		// We know testify uses pointer receivers so ignore value receivers to
+		// avoid complexity
+		ptr, ok := selObj.Type().(*types.Pointer)
+		if !ok {
+			logf("not pointer")
+			return
+		}
+		ptrType, ok := ptr.Elem().(*types.Named)
+		if !ok {
+			logf("not named")
+			return
+		}
+		fullImportPath = ptrType.Obj().Pkg().Path()
+		logf(fullImportPath)
+	}
 	if !isComparisonPackage(fullImportPath) {
+		logf("not comparison pkg")
 		return
 	}
 	checkComparison(pass, call, sel, fullImportPath)
@@ -109,7 +132,7 @@ func isMethod(pass *analysis.Pass, sel *ast.SelectorExpr) (ok bool) {
 	defer func() {
 		logf("isMethod: %+v %+v {%v}", sel.X, sel.Sel, ok)
 	}()
-	t, ok := pass.TypesInfo.Types[sel]
+	t, ok := pass.TypesInfo.Types[sel.X]
 	if !ok {
 		logf("not method")
 		return false
