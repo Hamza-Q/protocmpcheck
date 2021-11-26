@@ -33,10 +33,6 @@ var Analyzer = &analysis.Analyzer{
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	// for k, v := range pass.TypesInfo.Uses {
-	// fmt.Printf("ast.Ident: %v\tObject: %v\tast.Ident2: %#v\tObject: %#v\n", k, v, k, v)
-	// 	fmt.Printf("ast.Ident: %v\tObject: %v\n", k, v)
-	// }
 	for _, f := range pass.Files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			if call, ok := n.(*ast.CallExpr); ok {
@@ -48,7 +44,10 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
+// Checks the call for invalid protobuf comparisons.
+// Returns false if reported an error.
+func checkCall(pass *analysis.Pass, call *ast.CallExpr) (shouldRecurse bool) {
+	shouldRecurse = true
 	// Ignore calls to locally defined functions - they are almost definitely
 	// not calls to testify.
 	sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -94,7 +93,7 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 		logf("not comparison pkg")
 		return
 	}
-	checkComparison(pass, call, sel, fullImportPath)
+	return checkComparison(pass, call, sel, fullImportPath)
 }
 
 // is the selector expression calling a package known to make comparisons?
@@ -107,7 +106,8 @@ func isComparisonPackage(pkgName string) bool {
 	}
 }
 
-func checkComparison(pass *analysis.Pass, call *ast.CallExpr, sel *ast.SelectorExpr, pkgName string) {
+func checkComparison(pass *analysis.Pass, call *ast.CallExpr, sel *ast.SelectorExpr, pkgName string) (shouldRecurse bool) {
+	shouldRecurse = true
 	if pkgName == "reflect" && sel.Sel.Name != "DeepEqual" {
 		return
 	} else if strings.Contains(pkgName, "testify") && !isCheckableTestifyCall(sel.Sel.Name) {
@@ -115,7 +115,7 @@ func checkComparison(pass *analysis.Pass, call *ast.CallExpr, sel *ast.SelectorE
 	}
 
 	var arg1, arg2 ast.Expr
-	if pkgName == "reflect" || isMethod(pass, sel) { // or is testify struct - how do i identify this?
+	if pkgName == "reflect" || isMethod(pass, sel) {
 		arg1, arg2 = call.Args[0], call.Args[1]
 	} else {
 		arg1, arg2 = call.Args[1], call.Args[2]
@@ -125,7 +125,9 @@ func checkComparison(pass *analysis.Pass, call *ast.CallExpr, sel *ast.SelectorE
 			Pos:     call.Lparen,
 			Message: fmt.Sprintf("call to %s.%s comparing protobuf types not allowed", pkgName, sel.Sel.Name),
 		})
+		return false
 	}
+	return true
 }
 
 func isMethod(pass *analysis.Pass, sel *ast.SelectorExpr) (ok bool) {
