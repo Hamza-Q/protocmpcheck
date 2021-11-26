@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
@@ -91,17 +92,33 @@ func checkRequireEqual(t *testing.T, want, got *pb.HelloReply) {
 	gotSlice := []*pb.HelloReply{got}
 	require.Equal(t, expSlice, gotSlice)         // want "comparing proto"
 	require.ElementsMatch(t, expSlice, gotSlice) // want "comparing proto"
-
-	expInterfaceSlice := []interface{}{want}
-	gotInterfaceSlice := []interface{}{got}
-	require.Equal(t, expInterfaceSlice, gotInterfaceSlice)         // want "comparing proto"
-	require.ElementsMatch(t, expInterfaceSlice, gotInterfaceSlice) // want "comparing proto"
 }
 
 func checkRequireStructEqual(t *testing.T, want, got *pb.HelloReply) {
 	require := require.New(t)
 	require.EqualValues(want, got) // want "comparing proto"
+
+	expSlice := []*pb.HelloReply{want}
+	gotSlice := []*pb.HelloReply{got}
+	require.Equal(expSlice, gotSlice)         // want "comparing proto"
+	require.ElementsMatch(expSlice, gotSlice) // want "comparing proto"
 }
 
-func checkAssertEqual(t *testing.T, exp, r *pb.HelloReply)       {}
-func checkAssertStructEqual(t *testing.T, exp, r *pb.HelloReply) {}
+func checkAssertEqual(t *testing.T, want, got *pb.HelloReply) {
+	assert.Equal(t, want, got) // want "comparing proto"
+
+	expSlice := []*pb.HelloReply{want}
+	gotSlice := []*pb.HelloReply{got}
+	assert.Equal(t, expSlice, gotSlice)         // want "comparing proto"
+	assert.ElementsMatch(t, expSlice, gotSlice) // want "comparing proto"
+}
+
+func checkAssertStructEqual(t *testing.T, want, got *pb.HelloReply) {
+	assert := assert.New(t)
+	assert.EqualValues(want, got) // want "comparing proto"
+
+	expSlice := []*pb.HelloReply{want}
+	gotSlice := []*pb.HelloReply{got}
+	assert.Equal(expSlice, gotSlice)         // want "comparing proto"
+	assert.ElementsMatch(expSlice, gotSlice) // want "comparing proto"
+}
